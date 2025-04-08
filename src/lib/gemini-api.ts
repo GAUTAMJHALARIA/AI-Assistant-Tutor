@@ -208,7 +208,7 @@ ${text}`;
       ]);
       
       const retryResponse = await retryResult.response;
-      let retryText = retryResponse.text()
+      const retryText = retryResponse.text()
         .replace(/```json\s*/g, '')
         .replace(/```\s*$/g, '')
         .replace(/^\s+|\s+$/g, '')

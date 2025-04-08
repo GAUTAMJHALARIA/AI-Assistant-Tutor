@@ -1,10 +1,9 @@
-import { NextResponse } from 'next/server';
-import { YoutubeTranscript } from 'youtube-transcript';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { PythonShell } from 'python-shell';
+import { PythonShell, Options } from 'python-shell';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 async function downloadYouTubeVideo(videoId: string): Promise<string> {
   const outputPath = path.join(os.tmpdir(), `${videoId}.mp4`);
@@ -42,16 +41,15 @@ async function transcribeWithWhisper(
   onProgress?: (stage: TranscriptionStage) => void
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const options = {
-      mode: 'text',
+    const options: Options = {
+      mode: 'text' as const,
       pythonPath: 'python',
       scriptPath: path.join(process.cwd(), 'src', 'lib'),
       args: [audioPath],
-      pythonOptions: ['-u'], // Unbuffered output
+      pythonOptions: ['-u']
     };
 
     let transcript = '';
-    let transcriptStarted = false;
 
     const pythonShell = new PythonShell('transcribe.py', options);
 
@@ -75,7 +73,7 @@ async function transcribeWithWhisper(
         if (data.stage) {
           onProgress?.(data);
         }
-      } catch (e) {
+      } catch {
         // Ignore non-JSON messages
         console.log('Non-JSON message:', message);
       }
@@ -86,8 +84,8 @@ async function transcribeWithWhisper(
       // Clean up the audio file
       try {
         fs.unlinkSync(audioPath);
-      } catch (e) {
-        console.error('Error cleaning up audio file:', e);
+      } catch (err) {
+        console.error('Error cleaning up audio file:', err);
       }
 
       if (transcript) {
@@ -121,9 +119,21 @@ export async function POST(request: Request) {
       const videoId = getYouTubeVideoId(videoUrl);
 
       if (!videoId) {
-        return NextResponse.json(
-          { error: 'Invalid YouTube URL' },
-          { status: 400 }
+        return new Response(
+          `data: ${JSON.stringify({
+            error: 'Invalid YouTube URL',
+            stage: 'error',
+            progress: 0,
+            message: 'Invalid YouTube URL provided'
+          })}\n\n`,
+          {
+            headers: {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+            },
+            status: 400
+          }
         );
       }
 
@@ -152,9 +162,9 @@ export async function POST(request: Request) {
             },
           }
         );
-      } catch (error) {
+      } catch (ytError) {
         // If YouTube transcript fails, fallback to Whisper
-        console.log('YouTube transcript not available, falling back to Whisper...');
+        console.log('YouTube transcript not available, falling back to Whisper...', ytError);
         
         try {
           const audioPath = await downloadYouTubeVideo(videoId);
@@ -184,8 +194,8 @@ export async function POST(request: Request) {
                   message: 'Transcription complete!'
                 })}\n\n`));
                 controller.close();
-              } catch (error) {
-                controller.error(error);
+              } catch (transcribeError) {
+                controller.error(transcribeError);
               }
             },
           });
@@ -252,8 +262,8 @@ export async function POST(request: Request) {
                 message: 'Transcription complete!'
               })}\n\n`));
               controller.close();
-            } catch (error) {
-              controller.error(error);
+            } catch (transcribeError) {
+              controller.error(transcribeError);
             }
           },
         });
@@ -265,8 +275,8 @@ export async function POST(request: Request) {
             'Connection': 'keep-alive',
           },
         });
-      } catch (error) {
-        console.error('Error processing uploaded video:', error);
+      } catch (uploadError) {
+        console.error('Error processing uploaded video:', uploadError);
         return new Response(
           `data: ${JSON.stringify({
             error: 'Failed to transcribe uploaded video',
@@ -302,14 +312,14 @@ export async function POST(request: Request) {
         }
       );
     }
-  } catch (error) {
-    console.error('Transcription error:', error);
+  } catch (requestError) {
+    console.error('Transcription error:', requestError);
     return new Response(
       `data: ${JSON.stringify({
         error: 'Failed to process video',
         stage: 'error',
         progress: 0,
-        message: error instanceof Error ? error.message : 'An unexpected error occurred'
+        message: requestError instanceof Error ? requestError.message : 'An unexpected error occurred'
       })}\n\n`,
       {
         headers: {

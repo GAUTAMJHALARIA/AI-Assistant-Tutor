@@ -99,7 +99,6 @@ export default function LectureSummarizer() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let transcript = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -136,7 +135,10 @@ export default function LectureSummarizer() {
               }
               
               if (data.transcript) {
-                transcript = data.transcript;
+                setContent(prev => ({
+                  ...prev,
+                  transcription: data.transcript
+                }));
               }
             } catch (parseError) {
               console.error('Error parsing server message:', parseError);
@@ -197,7 +199,7 @@ export default function LectureSummarizer() {
           const formattedQuiz = Array.isArray(quizResponse) ? quizResponse : JSON.parse(quizResponse);
           setContent(prev => ({
             ...prev,
-            quiz: formattedQuiz.map((q: any) => ({
+            quiz: formattedQuiz.map((q: Quiz) => ({
               question: q.question,
               options: q.options,
               correct_answer: q.correct_answer,
