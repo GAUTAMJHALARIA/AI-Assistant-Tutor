@@ -17,6 +17,9 @@ export default function MathSolver() {
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState('');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [strokeColor, setStrokeColor] = useState('#000000');
+  const [isEraser, setIsEraser] = useState(false);
+  const [strokeWidth, setStrokeWidth] = useState(4);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -30,6 +33,27 @@ export default function MathSolver() {
   };
 
   const canvasRef = useRef<ReactSketchCanvasRef>(null);
+
+  const handleClearCanvas = () => {
+    canvasRef.current?.clearCanvas();
+  };
+
+  const handleUndo = () => {
+    canvasRef.current?.undo();
+  };
+
+  const handleRedo = () => {
+    canvasRef.current?.redo();
+  };
+
+  const handleResetCanvas = () => {
+    canvasRef.current?.resetCanvas();
+  };
+
+  const handleEraser = () => {
+    setIsEraser(!isEraser);
+    setStrokeColor(isEraser ? '#000000' : '#ffffff');
+  };
 
   const handleSolve = async () => {
     try {
@@ -78,10 +102,11 @@ export default function MathSolver() {
             <button
               key={method}
               onClick={() => setActiveMethod(method)}
-              className={`px-4 py-2 rounded-lg font-medium ${activeMethod === method
-                ? 'bg-indigo-100 text-indigo-700'
-                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
+              className={`px-4 py-2 rounded-lg font-medium ${
+                activeMethod === method
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
             >
               {method === 'draw' && '✏️ Draw'}
               {method === 'upload' && '📤 Upload'}
@@ -92,17 +117,79 @@ export default function MathSolver() {
 
         <div className="mb-6">
           {activeMethod === 'draw' && (
-            <div className="border rounded-lg overflow-hidden bg-white">
-              <ReactSketchCanvas
-                ref={canvasRef}
-                width="100%"
-                height="400px"
-                strokeWidth={4}
-                strokeColor="#000"
-                backgroundImage=""
-                exportWithBackgroundImage={true}
-                preserveBackgroundImageAspectRatio="none"
-              />
+            <div>
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="flex items-center space-x-2">
+                  <label htmlFor="color-picker" className="text-sm text-gray-600">Color:</label>
+                  <input
+                    id="color-picker"
+                    type="color"
+                    value={isEraser ? '#ffffff' : strokeColor}
+                    onChange={(e) => {
+                      setStrokeColor(e.target.value);
+                      setIsEraser(false);
+                    }}
+                    className="w-8 h-8 rounded cursor-pointer"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <label htmlFor="stroke-width" className="text-sm text-gray-600">Width:</label>
+                  <input
+                    id="stroke-width"
+                    type="range"
+                    min="1"
+                    max="20"
+                    value={strokeWidth}
+                    onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
+                    className="w-32"
+                  />
+                </div>
+                <button
+                  onClick={handleEraser}
+                  className={`px-3 py-1 rounded ${
+                    isEraser ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  ⌫ Eraser
+                </button>
+                <button
+                  onClick={handleUndo}
+                  className="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  ↩ Undo
+                </button>
+                <button
+                  onClick={handleRedo}
+                  className="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  ↪ Redo
+                </button>
+                <button
+                  onClick={handleClearCanvas}
+                  className="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  🗑 Clear
+                </button>
+                <button
+                  onClick={handleResetCanvas}
+                  className="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  🔄 Reset
+                </button>
+              </div>
+              <div className="border rounded-lg overflow-hidden bg-white">
+                <ReactSketchCanvas
+                  ref={canvasRef}
+                  width="100%"
+                  height="400px"
+                  strokeWidth={strokeWidth}
+                  strokeColor={strokeColor}
+                  backgroundImage=""
+                  exportWithBackgroundImage={true}
+                  preserveBackgroundImageAspectRatio="none"
+                  allowOnlyPointerType="all"
+                />
+              </div>
             </div>
           )}
 
@@ -178,10 +265,25 @@ export default function MathSolver() {
         <div className="mt-8 bg-white rounded-xl shadow-sm p-6">
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Solution</h2>
           <div className="prose max-w-none">
-            <h3 className="text-lg font-medium text-gray-900">Steps:</h3>
-            <pre className="bg-gray-50 p-4 rounded-lg">{solution.steps}</pre>
-            <h3 className="text-lg font-medium text-gray-900 mt-4">Explanation:</h3>
-            <p className="text-gray-700">{solution.explanation}</p>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xl font-medium text-gray-900 mb-3">Step-by-Step Solution:</h3>
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  {solution.steps.split('\n').map((step, index) => (
+                    <div key={index} className={`${index > 0 ? 'mt-4' : ''}`}>
+                      <p className="text-gray-800">{step}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-medium text-gray-900 mb-3">Detailed Explanation:</h3>
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <p className="text-gray-800 leading-relaxed">{solution.explanation}</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

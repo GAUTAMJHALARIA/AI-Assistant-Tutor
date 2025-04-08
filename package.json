@@ -13,9 +13,13 @@
     "@tailwindcss/typography": "^0.5.16",
     "next": "15.2.4",
     "openai": "^4.92.1",
+    "python-shell": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-sketch-canvas": "^6.2.0"
+    "react-icons": "^5.5.0",
+    "react-sketch-canvas": "^6.2.0",
+    "youtube-transcript": "^1.2.1",
+    "yt-dlp-wrap": "^2.3.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
