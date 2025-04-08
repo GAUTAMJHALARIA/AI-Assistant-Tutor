@@ -1,4 +1,6 @@
-import { YoutubeTranscript } from 'youtube-transcript';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { google } from 'googleapis';
+import axios from 'axios';
 
 function getYouTubeVideoId(url: string): string | null {
   const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
@@ -6,15 +8,75 @@ function getYouTubeVideoId(url: string): string | null {
   return (match && match[7].length === 11) ? match[7] : null;
 }
 
-// Proxy configuration
-const proxyConfig = {
-  host: process.env.PROXY_HOST || 'p.webshare.io',
-  port: parseInt(process.env.PROXY_PORT || '80'),
-  auth: {
-    username: process.env.PROXY_USERNAME || '',
-    password: process.env.PROXY_PASSWORD || ''
+// Get API keys from environment variables
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+
+if (!GEMINI_API_KEY) {
+  throw new Error('Missing Gemini API key - please set NEXT_PUBLIC_GEMINI_API_KEY in your environment variables');
+}
+
+if (!YOUTUBE_API_KEY) {
+  throw new Error('Missing YouTube API key - please set YOUTUBE_API_KEY in your environment variables');
+}
+
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+// Initialize YouTube API
+const youtube = google.youtube('v3');
+
+async function getVideoMetadata(videoId: string) {
+  try {
+    const response = await youtube.videos.list({
+      key: YOUTUBE_API_KEY,
+      part: ['snippet', 'contentDetails'],
+      id: [videoId]
+    });
+
+    if (!response.data.items || response.data.items.length === 0) {
+      throw new Error('Video not found');
+    }
+
+    const video = response.data.items[0];
+    return {
+      title: video.snippet?.title || '',
+      description: video.snippet?.description || '',
+      channelTitle: video.snippet?.channelTitle || '',
+      duration: video.contentDetails?.duration || ''
+    };
+  } catch (error) {
+    console.error('Error fetching video metadata:', error);
+    throw new Error('Failed to fetch video metadata');
   }
-};
+}
+
+async function getVideoTranscript(videoId: string) {
+  try {
+    // Try to get transcript from YouTube's transcript API
+    const response = await axios.get(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    // Extract transcript data from the page
+    const transcriptMatch = response.data.match(/"captions":({.*?}),"videoDetails"/);
+    if (!transcriptMatch) {
+      return null;
+    }
+
+    const transcriptData = JSON.parse(transcriptMatch[1]);
+    const baseUrl = transcriptData.playerCaptionsTracklistRenderer.captionTracks[0].baseUrl;
+    
+    // Fetch the actual transcript
+    const transcriptResponse = await axios.get(baseUrl);
+    return transcriptResponse.data;
+  } catch (error) {
+    console.error('Error fetching video transcript:', error);
+    return null;
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -70,79 +132,102 @@ export async function POST(request: Request) {
             stage: 'preparing',
             progress: 0,
             estimatedTimeRemaining: 5,
-            message: 'Fetching YouTube transcript...'
+            message: 'Fetching video metadata...'
           })}\n\n`));
 
-          // Get YouTube transcript with retry mechanism and proxy
-          let transcript;
-          let retries = 3;
-          let lastError;
-
-          while (retries > 0) {
-            try {
-              // Configure proxy for this request
-              const httpsAgent = new (require('https').Agent)({
-                proxy: proxyConfig,
-                rejectUnauthorized: false
-              });
-
-              transcript = await YoutubeTranscript.fetchTranscript(videoId, {
-                httpsAgent,
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                  'Accept-Language': 'en-US,en;q=0.5',
-                  'Accept-Encoding': 'gzip, deflate, br',
-                  'DNT': '1',
-                  'Connection': 'keep-alive',
-                  'Upgrade-Insecure-Requests': '1',
-                  'Sec-Fetch-Dest': 'document',
-                  'Sec-Fetch-Mode': 'navigate',
-                  'Sec-Fetch-Site': 'none',
-                  'Sec-Fetch-User': '?1',
-                  'Cache-Control': 'max-age=0',
-                  'Referer': 'https://www.youtube.com/',
-                  'Origin': 'https://www.youtube.com'
-                }
-              });
-              break;
-            } catch (error) {
-              lastError = error;
-              retries--;
-              if (retries > 0) {
-                // Wait before retrying with exponential backoff
-                await new Promise(resolve => setTimeout(resolve, Math.pow(2, 3 - retries) * 1000));
-              }
-            }
-          }
-
-          if (!transcript) {
-            const errorMessage = lastError instanceof Error ? lastError.message : 'Failed to fetch transcript';
-            throw new Error(`Failed to fetch transcript after retries: ${errorMessage}`);
-          }
+          // Get video metadata
+          const metadata = await getVideoMetadata(videoId);
 
           // Send progress update
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             stage: 'processing',
-            progress: 50,
-            estimatedTimeRemaining: 2,
-            message: 'Processing transcript...'
+            progress: 30,
+            estimatedTimeRemaining: 3,
+            message: 'Attempting to fetch transcript...'
           })}\n\n`));
 
-          // Combine transcript parts
-          const fullText = transcript
-            .map(part => part.text)
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
+          // Try to get the actual transcript
+          const transcript = await getVideoTranscript(videoId);
+          let transcription;
 
-          if (!fullText) {
-            throw new Error('No transcript content found. The video might not have captions enabled.');
+          if (transcript) {
+            // Use the actual transcript
+            transcription = transcript;
+          } else {
+            // Fall back to Gemini for content analysis
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              stage: 'processing',
+              progress: 50,
+              estimatedTimeRemaining: 2,
+              message: 'Generating transcription from metadata...'
+            })}\n\n`));
+
+            // Generate prompt for Gemini
+            const prompt = `You are an expert video content analyzer. Please analyze this YouTube video and provide a detailed transcription based on its metadata.
+
+Video Title: ${metadata.title}
+Channel: ${metadata.channelTitle}
+Description: ${metadata.description}
+Duration: ${metadata.duration}
+
+Guidelines:
+1. Create a comprehensive transcription that captures the likely content of the video
+2. Include important visual descriptions when relevant
+3. Break the content into logical paragraphs
+4. Include estimated timestamps for major sections
+5. Preserve technical terms and proper nouns
+6. Note any important visual elements or demonstrations
+7. If the video appears to be educational, focus on key concepts and learning points
+
+Please provide the transcription in this format using proper markdown:
+
+# ${metadata.title}
+
+## Overview
+[Brief introduction of the video content]
+
+## Main Content
+### [00:00] Section 1
+- Key point 1
+  - Supporting detail
+  - Example or explanation
+- Key point 2
+  - Supporting detail
+  - Example or explanation
+
+### [00:00] Section 2
+- Key point 1
+  - Supporting detail
+  - Example or explanation
+- Key point 2
+  - Supporting detail
+  - Example or explanation
+
+## Key Takeaways
+- Main takeaway 1
+- Main takeaway 2
+- Main takeaway 3
+
+## Additional Notes
+- Important visual elements or demonstrations
+- Technical terms and definitions
+- Related concepts or references
+
+Note: This is a generated transcription based on the video's metadata. It represents a likely structure and content of the video.`;
+
+            // Generate content with Gemini
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            transcription = response.text();
+          }
+
+          if (!transcription) {
+            throw new Error('Failed to generate transcription');
           }
 
           // Send final result
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-            transcript: fullText,
+            transcript: transcription,
             stage: 'complete',
             progress: 100,
             estimatedTimeRemaining: 0,
@@ -154,7 +239,7 @@ export async function POST(request: Request) {
           console.error('Transcription error:', error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-            error: 'Failed to fetch transcript',
+            error: 'Failed to generate transcription',
             stage: 'error',
             progress: 0,
             message: errorMessage
