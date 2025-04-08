@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const GEMINI_API_KEY = "AIzaSyCpBixDk37d92bP_gQxL2p1akhbiEX5nWA";
+// Get API key from environment variable
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
   throw new Error('Missing Gemini API key - please set NEXT_PUBLIC_GEMINI_API_KEY in your environment variables');
@@ -9,7 +10,7 @@ if (!GEMINI_API_KEY) {
 export const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 // Using different models for text and image processing
-export const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+export const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 export const geminiVisionModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
 export async function generateMathSolution(input: string) {
@@ -99,200 +100,73 @@ DETAILED EXPLANATION:
   }
 }
 
-export async function generateLectureSummary(text: string) {
+const getGeminiClient = () => {
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured. Please check your environment variables.');
+  }
+  return new GoogleGenerativeAI(apiKey);
+};
+
+export const generateLectureSummary = async (text: string): Promise<string> => {
   try {
-    const prompt = `Analyze this lecture content and create a detailed summary. Structure your response EXACTLY as follows:
+    const genAI = getGeminiClient();
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-QUICK OVERVIEW
-• Brief 2-3 sentence overview of the main topic
-• Why this topic is important
-• What you'll learn from this lecture
+    const prompt = `Please provide a comprehensive summary of the following lecture content. Focus on the main concepts, key points, and important relationships:
 
-MAIN CONCEPTS
-• [Concept 1 Name]: Detailed explanation with examples
-• [Concept 2 Name]: Detailed explanation with examples
-• [Concept 3 Name]: Detailed explanation with examples
+${text}`;
 
-KEY RELATIONSHIPS
-• How the main concepts connect to each other
-• Important cause-and-effect relationships
-• Real-world applications or implications
-
-IMPORTANT TERMINOLOGY
-• [Term 1]: Clear definition with example usage
-• [Term 2]: Clear definition with example usage
-• [Term 3]: Clear definition with example usage
-
-CRITICAL INSIGHTS
-• Key insight or takeaway 1 with explanation
-• Key insight or takeaway 2 with explanation
-• Key insight or takeaway 3 with explanation
-
-Note: Replace bracketed text with actual content. Use bullet points (•) consistently. Make each point detailed and informative.`;
-
-    const result = await geminiModel.generateContent(prompt + "\n\nLecture content:\n" + text);
+    const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text();
   } catch (error) {
     console.error('Error generating lecture summary:', error);
-    throw error instanceof Error ? error : new Error('Failed to generate lecture summary');
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate summary: ${error.message}`);
+    }
+    throw new Error('Failed to generate summary. Please try again.');
   }
-}
+};
 
-export async function generateLectureQuiz(text: string) {
+export const generateLectureQuiz = async (text: string): Promise<string> => {
   try {
-    const prompt = `Based on this lecture content, generate a quiz with 5 multiple-choice questions. Return ONLY a valid JSON array with no additional text, markdown formatting, or code blocks. Each question object must have these exact fields:
-{
-  "question": "The question text",
-  "options": ["Option A", "Option B", "Option C", "Option D"],
-  "correct_answer": "A", // Must be A, B, C, or D
-  "explanation": "Why this answer is correct"
-}
+    const genAI = getGeminiClient();
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-Requirements:
-1. Each question tests understanding of key concepts
-2. Options are clear and unambiguous
-3. Exactly 4 options per question
-4. Correct answer is marked as A, B, C, or D
-5. Explanation is concise but informative
-6. Response must be ONLY the JSON array with no additional text or formatting
+    const prompt = `Generate a quiz based on the following lecture content. Include 5 multiple choice questions. For each question, provide the correct answer and a brief explanation. Format the response as a JSON array of objects with the following structure: { question: string, options: string[], correct_answer: string, explanation: string }
 
-Lecture content:
 ${text}`;
 
-    const result = await geminiModel.generateContent([
-      { text: prompt }
-    ]);
-    
+    const result = await model.generateContent(prompt);
     const response = await result.response;
-    let responseText = response.text();
-    
-    // Clean the response text to remove any markdown or code block syntax
-    responseText = responseText
-      .replace(/```json\s*/g, '')  // Remove ```json
-      .replace(/```\s*$/g, '')     // Remove closing ```
-      .replace(/^\s+|\s+$/g, '')   // Trim whitespace
-      .replace(/\\n/g, ' ')        // Replace escaped newlines
-      .replace(/\n/g, ' ');        // Replace actual newlines
-    
-    try {
-      // Try to parse the cleaned response as JSON
-      const parsedQuiz = JSON.parse(responseText);
-      
-      // Validate the quiz format
-      if (!Array.isArray(parsedQuiz)) {
-        throw new Error('Quiz response is not an array');
-      }
-      
-      // Validate each question
-      parsedQuiz.forEach((q, idx) => {
-        if (!q.question || !Array.isArray(q.options) || q.options.length !== 4 || 
-            !q.correct_answer || !q.explanation) {
-          throw new Error(`Invalid question format at index ${idx}`);
-        }
-        if (!['A', 'B', 'C', 'D'].includes(q.correct_answer)) {
-          throw new Error(`Invalid correct_answer at index ${idx}`);
-        }
-      });
-      
-      return parsedQuiz;
-    } catch (parseError) {
-      console.error('Failed to parse quiz response:', parseError);
-      console.error('Raw response:', responseText);
-      
-      // Try to generate again with a more strict prompt
-      const retryPrompt = `${prompt}\n\nIMPORTANT: Return ONLY the JSON array with no additional text, markdown, or formatting. The response must start with [ and end with ]. No code blocks or other text allowed.`;
-      
-      const retryResult = await geminiModel.generateContent([
-        { text: retryPrompt }
-      ]);
-      
-      const retryResponse = await retryResult.response;
-      const retryText = retryResponse.text()
-        .replace(/```json\s*/g, '')
-        .replace(/```\s*$/g, '')
-        .replace(/^\s+|\s+$/g, '')
-        .replace(/\\n/g, ' ')
-        .replace(/\n/g, ' ');
-      
-      try {
-        const retryParsed = JSON.parse(retryText);
-        if (Array.isArray(retryParsed) && retryParsed.length > 0) {
-          return retryParsed;
-        }
-      } catch {
-        throw new Error('Failed to generate valid quiz format after retry');
-      }
-      throw new Error('Failed to generate valid quiz format');
-    }
+    return response.text();
   } catch (error) {
     console.error('Error generating lecture quiz:', error);
-    throw error instanceof Error ? error : new Error('Failed to generate lecture quiz');
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate quiz: ${error.message}`);
+    }
+    throw new Error('Failed to generate quiz. Please try again.');
   }
-}
+};
 
-export async function generateLectureNotes(text: string) {
+export const generateLectureNotes = async (text: string): Promise<string> => {
   try {
-    const prompt = `Create comprehensive study notes from this lecture content. Structure your response EXACTLY as follows:
+    const genAI = getGeminiClient();
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-LECTURE OVERVIEW
-• Topic Introduction: Brief overview of the subject matter
-• Learning Objectives: What you should understand after this lecture
-• Prerequisites: Required background knowledge or concepts
-• Real-World Relevance: Why this topic matters in practice
+    const prompt = `Please create detailed lecture notes from the following content. Include main concepts, definitions, examples, and key relationships:
 
-CORE CONCEPTS IN DETAIL
-• [Concept 1 Name]
-  - Detailed explanation of the concept
-  - Key characteristics or components
-  - Common misconceptions or challenges
-  - Practical examples or applications
+${text}`;
 
-• [Concept 2 Name]
-  - Detailed explanation of the concept
-  - Key characteristics or components
-  - Common misconceptions or challenges
-  - Practical examples or applications
-
-• [Concept 3 Name]
-  - Detailed explanation of the concept
-  - Key characteristics or components
-  - Common misconceptions or challenges
-  - Practical examples or applications
-
-PRACTICAL APPLICATIONS
-• [Application 1]: Detailed example with step-by-step explanation
-• [Application 2]: Detailed example with step-by-step explanation
-• Common Use Cases: Where and how these concepts are applied
-
-IMPORTANT FORMULAS & PRINCIPLES
-• [Formula/Principle 1]
-  - What it means
-  - When to use it
-  - Example application
-• [Formula/Principle 2]
-  - What it means
-  - When to use it
-  - Example application
-
-CONNECTIONS & RELATIONSHIPS
-• How different concepts relate to each other
-• Dependencies and prerequisites
-• Integration with other topics or fields
-
-// STUDY TIPS & COMMON PITFALLS
-// • Key points to remember
-// • Common mistakes to avoid
-// • Practice suggestions
-// • Review strategies
-
-Note: Replace bracketed text with actual content. Use bullet points (•) for main points and hyphens (-) for sub-points. Make explanations clear and detailed.`;
-
-    const result = await geminiModel.generateContent(prompt + "\n\nLecture content:\n" + text);
+    const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text();
   } catch (error) {
     console.error('Error generating lecture notes:', error);
-    throw error instanceof Error ? error : new Error('Failed to generate lecture notes');
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate notes: ${error.message}`);
+    }
+    throw new Error('Failed to generate notes. Please try again.');
   }
-}
+};

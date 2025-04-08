@@ -188,36 +188,62 @@ export default function LectureSummarizer() {
     try {
       switch (type) {
         case 'summary':
-          const summary = await generateLectureSummary(inputText);
-          setContent(prev => ({
-            ...prev,
-            summary
-          }));
+          try {
+            const summary = await generateLectureSummary(inputText);
+            setContent(prev => ({
+              ...prev,
+              summary
+            }));
+          } catch (summaryError) {
+            console.error('Error generating summary:', summaryError);
+            setError('Failed to generate summary. Please check your API key and try again.');
+            return;
+          }
           break;
         case 'quiz':
-          const quizResponse = await generateLectureQuiz(inputText);
-          const formattedQuiz = Array.isArray(quizResponse) ? quizResponse : JSON.parse(quizResponse);
-          setContent(prev => ({
-            ...prev,
-            quiz: formattedQuiz.map((q: Quiz) => ({
-              question: q.question,
-              options: q.options,
-              correct_answer: q.correct_answer,
-              explanation: q.explanation
-            }))
-          }));
+          try {
+            const quizResponse = await generateLectureQuiz(inputText);
+            const formattedQuiz = Array.isArray(quizResponse) ? quizResponse : JSON.parse(quizResponse);
+            setContent(prev => ({
+              ...prev,
+              quiz: formattedQuiz.map((q: Quiz) => ({
+                question: q.question,
+                options: q.options,
+                correct_answer: q.correct_answer,
+                explanation: q.explanation
+              }))
+            }));
+          } catch (quizError) {
+            console.error('Error generating quiz:', quizError);
+            setError('Failed to generate quiz. Please check your API key and try again.');
+            return;
+          }
           break;
         case 'notes':
-          const notes = await generateLectureNotes(inputText);
-          setContent(prev => ({
-            ...prev,
-            notes
-          }));
+          try {
+            const notes = await generateLectureNotes(inputText);
+            setContent(prev => ({
+              ...prev,
+              notes
+            }));
+          } catch (notesError) {
+            console.error('Error generating notes:', notesError);
+            setError('Failed to generate notes. Please check your API key and try again.');
+            return;
+          }
           break;
       }
     } catch (err) {
-      setError('Failed to generate content. Please try again.');
       console.error('Error generating content:', err);
+      if (err instanceof Error) {
+        if (err.message.includes('API key')) {
+          setError('Invalid or missing API key. Please check your environment variables.');
+        } else {
+          setError(`Failed to generate content: ${err.message}`);
+        }
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
