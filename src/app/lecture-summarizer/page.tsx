@@ -203,7 +203,21 @@ export default function LectureSummarizer() {
         case 'quiz':
           try {
             const quizResponse = await generateLectureQuiz(inputText);
-            const formattedQuiz = Array.isArray(quizResponse) ? quizResponse : JSON.parse(quizResponse);
+            let formattedQuiz;
+            
+            try {
+              formattedQuiz = JSON.parse(quizResponse);
+            } catch (parseError) {
+              console.error('Failed to parse quiz response:', parseError);
+              setError('Failed to generate quiz. Please try again.');
+              return;
+            }
+
+            if (!Array.isArray(formattedQuiz) || formattedQuiz.length === 0) {
+              setError('Invalid quiz format received. Please try again.');
+              return;
+            }
+
             setContent(prev => ({
               ...prev,
               quiz: formattedQuiz.map((q: Quiz) => ({
@@ -334,9 +348,9 @@ export default function LectureSummarizer() {
           <div className="flex space-x-4 mb-4">
             <button
               onClick={() => setVideoSource('youtube')}
-              className={`px-4 py-2 rounded-lg font-medium ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 videoSource === 'youtube'
-                  ? 'bg-indigo-100 text-indigo-700'
+                  ? 'bg-indigo-600 text-white shadow-md'
                   : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -344,9 +358,9 @@ export default function LectureSummarizer() {
             </button>
             <button
               onClick={() => setVideoSource('upload')}
-              className={`px-4 py-2 rounded-lg font-medium ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 videoSource === 'upload'
-                  ? 'bg-indigo-100 text-indigo-700'
+                  ? 'bg-indigo-600 text-white shadow-md'
                   : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -370,9 +384,9 @@ export default function LectureSummarizer() {
                 <button
                   onClick={handleTranscribe}
                   disabled={loading}
-                  className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400"
+                  className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 shadow-md hover:shadow-lg transition-all"
                 >
-                  Transcribe Video
+                  {loading ? 'Transcribing...' : 'Transcribe Video'}
                 </button>
               )}
             </div>
@@ -400,9 +414,9 @@ export default function LectureSummarizer() {
                     <button
                       onClick={handleTranscribe}
                       disabled={loading}
-                      className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400"
+                      className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 shadow-md hover:shadow-lg transition-all"
                     >
-                      Transcribe Video
+                      {loading ? 'Transcribing...' : 'Transcribe Video'}
                     </button>
                   </div>
                 ) : (
