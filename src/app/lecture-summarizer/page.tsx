@@ -5,7 +5,7 @@ import { generateLectureSummary, generateLectureQuiz, generateLectureNotes } fro
 import { FiX, FiCheck } from 'react-icons/fi';
 
 type ProcessingStep = 'transcribe' | 'summary' | 'quiz' | 'notes' | null;
-type VideoSource = 'youtube' | 'upload' | null;
+type VideoSource = 'upload' | null;
 
 type Quiz = {
   question: string;
@@ -29,8 +29,7 @@ type TranscriptionStage = {
 };
 
 export default function LectureSummarizer() {
-  const [videoUrl, setVideoUrl] = useState('');
-  const [videoSource, setVideoSource] = useState<VideoSource>('youtube');
+  const [videoSource, setVideoSource] = useState<VideoSource>('upload');
   const [processingStep, setProcessingStep] = useState<ProcessingStep>(null);
   const [loading, setLoading] = useState(false);
   const [content, setContent] = useState<Content>({});
@@ -48,10 +47,6 @@ export default function LectureSummarizer() {
       setUploadedVideo(file);
       setVideoSource('upload');
     }
-  };
-
-  const handleVideoUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setVideoUrl(event.target.value);
   };
 
   const handleTranscribe = async () => {
@@ -75,12 +70,10 @@ export default function LectureSummarizer() {
     try {
       const formData = new FormData();
       
-      if (videoSource === 'youtube' && videoUrl) {
-        formData.append('videoUrl', videoUrl);
-      } else if (videoSource === 'upload' && uploadedVideo) {
+      if (videoSource === 'upload' && uploadedVideo) {
         formData.append('videoFile', uploadedVideo);
       } else {
-        throw new Error('No video source selected');
+        throw new Error('No video file selected');
       }
 
       const response = await fetch('/api/transcribe', {
@@ -342,101 +335,52 @@ export default function LectureSummarizer() {
 
       <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
         <div className="mb-6">
-          <div className="flex space-x-4 mb-4">
-            <button
-              onClick={() => setVideoSource('youtube')}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                videoSource === 'youtube'
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-              }`}
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            <input
+              type="file"
+              accept="video/*"
+              onChange={handleVideoUpload}
+              className="hidden"
+              id="video-upload"
+            />
+            <label
+              htmlFor="video-upload"
+              className="cursor-pointer block"
             >
-              🎥 YouTube URL
-            </button>
-            <button
-              onClick={() => setVideoSource('upload')}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                videoSource === 'upload'
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              📤 Upload Video
-            </button>
-          </div>
-
-          {videoSource === 'youtube' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                YouTube Video URL
-              </label>
-              <input
-                type="url"
-                value={videoUrl}
-                onChange={handleVideoUrlChange}
-                placeholder="Paste YouTube video URL here..."
-                className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 placeholder:text-gray-500"
-              />
-              {videoUrl && (
-                <button
-                  onClick={handleTranscribe}
-                  disabled={loading}
-                  className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400"
-                >
-                  Transcribe Video
-                </button>
+              {uploadedVideo ? (
+                <div className="text-gray-700">
+                  <p className="font-medium">{uploadedVideo.name}</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {(uploadedVideo.size / (1024 * 1024)).toFixed(2)} MB
+                  </p>
+                  <button
+                    onClick={handleTranscribe}
+                    disabled={loading}
+                    className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400"
+                  >
+                    Transcribe Video
+                  </button>
+                </div>
+              ) : (
+                <div className="text-gray-500">
+                  <svg
+                    className="mx-auto h-12 w-12 text-gray-400"
+                    stroke="currentColor"
+                    fill="none"
+                    viewBox="0 0 48 48"
+                  >
+                    <path
+                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <p className="mt-1">Click to upload a video file</p>
+                </div>
               )}
-            </div>
-          )}
-
-          {videoSource === 'upload' && (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleVideoUpload}
-                className="hidden"
-                id="video-upload"
-              />
-              <label
-                htmlFor="video-upload"
-                className="cursor-pointer block"
-              >
-                {uploadedVideo ? (
-                  <div className="text-gray-700">
-                    <p className="font-medium">{uploadedVideo.name}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {(uploadedVideo.size / (1024 * 1024)).toFixed(2)} MB
-                    </p>
-                    <button
-                      onClick={handleTranscribe}
-                      disabled={loading}
-                      className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400"
-                    >
-                      Transcribe Video
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-gray-500">
-                    <svg
-                      className="mx-auto h-12 w-12 text-gray-400"
-                      stroke="currentColor"
-                      fill="none"
-                      viewBox="0 0 48 48"
-                    >
-                      <path
-                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    <p className="mt-1">Click to upload a video file</p>
-                  </div>
-                )}
-              </label>
-            </div>
-          )}
+            </label>
+          </div>
         </div>
 
         {error && (
