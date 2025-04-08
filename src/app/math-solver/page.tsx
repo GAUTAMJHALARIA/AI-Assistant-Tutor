@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { ReactSketchCanvas } from 'react-sketch-canvas';
+import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
 import Image from 'next/image';
 import { generateMathSolution, generateMathSolutionFromImage } from '@/lib/math-api';
 
@@ -29,7 +29,7 @@ export default function MathSolver() {
     }
   };
 
-  const canvasRef = useRef<ReactSketchCanvas>(null);
+  const canvasRef = useRef<ReactSketchCanvasRef>(null);
 
   const handleSolve = async () => {
     try {
@@ -39,7 +39,7 @@ export default function MathSolver() {
       switch (activeMethod) {
         case 'draw':
           if (!canvasRef.current) break;
-          const imageData = await canvasRef.current.exportImage('jpeg');
+          const imageData = await canvasRef.current!.exportImage('jpeg');
           result = await generateMathSolutionFromImage(imageData);
           break;
 

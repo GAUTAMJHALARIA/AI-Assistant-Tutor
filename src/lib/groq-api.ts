@@ -43,7 +43,7 @@ Problem: ${input}`;
     
     try {
       return JSON.parse(result);
-    } catch (parseError) {
+    } catch {
       throw new Error('Failed to parse GROQ API response as JSON');
     }
   } catch (error) {
@@ -52,23 +52,6 @@ Problem: ${input}`;
   }
 }
 
-export async function generateMathSolutionFromImage(imageData: string) {
-  try {
-    const prompt = "Please solve this math problem from the image and provide detailed steps. Format the response as a JSON with this structure:\n{\n  \"steps\": \"numbered steps showing the solution process\",\n  \"explanation\": \"detailed explanation of the approach and concepts\"\n}";
-
-    // Remove data URL prefix if present
-    const base64Image = imageData.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
-    
-    // Since GROQ doesn't support direct image input, we'll use OCR to extract text first
-    // For now, we'll throw an error as OCR integration is pending
-    throw new Error('Image processing requires OCR integration which is not yet implemented');
-
-    // Once we have OCR:
-    // 1. Extract text from image using OCR
-    // 2. Pass the extracted text to generateMathSolution
-    // 3. Return the solution
-  } catch (error) {
-    console.error('Error generating math solution from image:', error);
-    throw error instanceof Error ? error : new Error('An unexpected error occurred');
-  }
+export async function generateMathSolutionFromImage() {
+  throw new Error('Image processing requires OCR integration which is not yet implemented');
 }

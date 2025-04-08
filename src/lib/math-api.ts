@@ -1,12 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
-function validateAPIResponse(response: Response) {
-  if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
-  }
-  return response;
-}
-
 export async function generateMathSolution(input: string) {
   try {
     if (!input.trim()) {
@@ -33,7 +26,7 @@ const response = await fetch(`${API_BASE_URL}/math/solve`, {
     const text = await response.text();
     try {
       return JSON.parse(text);
-    } catch (parseError) {
+    } catch {
       throw new Error('Failed to parse API response as JSON');
     }
   } catch (error) {
@@ -77,7 +70,7 @@ const response = await fetch(`${API_BASE_URL}/math/solve-image`, {
     const text = await response.text();
     try {
       return JSON.parse(text);
-    } catch (parseError) {
+    } catch {
       throw new Error('Failed to parse the solution response. The server returned an invalid format.');
     }
   } catch (error) {

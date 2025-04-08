@@ -27,15 +27,14 @@ Problem: ${input}`;
     const text = response.text();
     try {
       return JSON.parse(text);
-    } catch (error) {
+    } catch {
       return {
         steps: text,
         explanation: 'The response could not be parsed as JSON. Showing raw output.'
       };
     }
-  } catch (error) {
-    console.error('Error generating math solution:', error);
-    throw error;
+  } catch {
+    throw new Error('Failed to generate math solution');
   }
 }
 
@@ -43,14 +42,11 @@ export async function generateMathSolutionFromImage(imageData: string) {
   try {
     const prompt = "Please solve this math problem from the image and provide detailed steps. Format the response as a JSON with this structure:\n{\n  \"steps\": \"numbered steps showing the solution process\",\n  \"explanation\": \"detailed explanation of the approach and concepts\"\n}";
 
-    // Remove data URL prefix if present
-    const base64Image = imageData.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
-    
     const result = await geminiVisionModel.generateContent([
       prompt,
       {
         inlineData: {
-          data: base64Image,
+          data: imageData.replace(/^data:image\/(png|jpeg|jpg);base64,/, ''),
           mimeType: 'image/jpeg'
         }
       }
@@ -60,14 +56,13 @@ export async function generateMathSolutionFromImage(imageData: string) {
     const text = response.text();
     try {
       return JSON.parse(text);
-    } catch (error) {
+    } catch {
       return {
         steps: text,
         explanation: 'The response could not be parsed as JSON. Showing raw output.'
       };
     }
-  } catch (error) {
-    console.error('Error generating math solution from image:', error);
-    throw error;
+  } catch {
+    throw new Error('Failed to generate math solution from image');
   }
 }
