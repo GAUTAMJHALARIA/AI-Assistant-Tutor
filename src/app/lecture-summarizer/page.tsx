@@ -87,30 +87,41 @@ export default function LectureSummarizer() {
         method: 'POST',
         body: formData,
         signal: abortControllerRef.current.signal,
+        headers: {
+          'Accept': 'text/event-stream',
+        },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to start transcription: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Failed to start transcription: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       if (!response.body) {
-        throw new Error('No response body received');
+        throw new Error('No response body received from server');
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the last incomplete line in the buffer
 
         for (const line of lines) {
+          if (line.trim() === '') continue; // Skip empty lines
+          
           if (line.startsWith('data: ')) {
             try {
-              const data = JSON.parse(line.slice(6));
+              const jsonStr = line.slice(6).trim();
+              if (!jsonStr) continue; // Skip empty data messages
+              
+              const data = JSON.parse(jsonStr);
               
               if (data.error) {
                 throw new Error(data.error);
@@ -141,8 +152,8 @@ export default function LectureSummarizer() {
                 }));
               }
             } catch (parseError) {
-              console.error('Error parsing server message:', parseError);
-              throw new Error('Failed to process server response');
+              console.error('Error parsing server message:', parseError, 'Line:', line);
+              throw new Error(`Failed to process server response: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`);
             }
           }
         }
@@ -203,21 +214,7 @@ export default function LectureSummarizer() {
         case 'quiz':
           try {
             const quizResponse = await generateLectureQuiz(inputText);
-            let formattedQuiz;
-            
-            try {
-              formattedQuiz = JSON.parse(quizResponse);
-            } catch (parseError) {
-              console.error('Failed to parse quiz response:', parseError);
-              setError('Failed to generate quiz. Please try again.');
-              return;
-            }
-
-            if (!Array.isArray(formattedQuiz) || formattedQuiz.length === 0) {
-              setError('Invalid quiz format received. Please try again.');
-              return;
-            }
-
+            const formattedQuiz = Array.isArray(quizResponse) ? quizResponse : JSON.parse(quizResponse);
             setContent(prev => ({
               ...prev,
               quiz: formattedQuiz.map((q: Quiz) => ({
@@ -348,9 +345,9 @@ export default function LectureSummarizer() {
           <div className="flex space-x-4 mb-4">
             <button
               onClick={() => setVideoSource('youtube')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg font-medium ${
                 videoSource === 'youtube'
-                  ? 'bg-indigo-600 text-white shadow-md'
+                  ? 'bg-indigo-100 text-indigo-700'
                   : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -358,9 +355,9 @@ export default function LectureSummarizer() {
             </button>
             <button
               onClick={() => setVideoSource('upload')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg font-medium ${
                 videoSource === 'upload'
-                  ? 'bg-indigo-600 text-white shadow-md'
+                  ? 'bg-indigo-100 text-indigo-700'
                   : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -384,9 +381,9 @@ export default function LectureSummarizer() {
                 <button
                   onClick={handleTranscribe}
                   disabled={loading}
-                  className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 shadow-md hover:shadow-lg transition-all"
+                  className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400"
                 >
-                  {loading ? 'Transcribing...' : 'Transcribe Video'}
+                  Transcribe Video
                 </button>
               )}
             </div>
@@ -414,9 +411,9 @@ export default function LectureSummarizer() {
                     <button
                       onClick={handleTranscribe}
                       disabled={loading}
-                      className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 shadow-md hover:shadow-lg transition-all"
+                      className="mt-4 px-6 py-3 rounded-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400"
                     >
-                      {loading ? 'Transcribing...' : 'Transcribe Video'}
+                      Transcribe Video
                     </button>
                   </div>
                 ) : (

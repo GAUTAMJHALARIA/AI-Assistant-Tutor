@@ -10,8 +10,8 @@ if (!GEMINI_API_KEY) {
 export const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 // Using different models for text and image processing
-export const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-export const geminiVisionModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+export const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+export const geminiVisionModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 export async function generateMathSolution(input: string) {
   try {
@@ -111,7 +111,7 @@ const getGeminiClient = () => {
 export const generateLectureSummary = async (text: string): Promise<string> => {
   try {
     const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `You are an expert educational content summarizer. Create a comprehensive summary of the following lecture content.
 
@@ -207,7 +207,7 @@ const fixJsonFormatting = (text: string): string => {
 export const generateLectureQuiz = async (text: string): Promise<string> => {
   try {
     const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `You are an expert educational quiz creator. Generate a comprehensive quiz based on the following lecture content.
 
@@ -312,7 +312,7 @@ ${text}`;
 export const generateLectureNotes = async (text: string): Promise<string> => {
   try {
     const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `You are an expert educational note-taker. Create comprehensive study notes from the following lecture content.
 
