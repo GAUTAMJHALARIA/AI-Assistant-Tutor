@@ -6,6 +6,31 @@ function getYouTubeVideoId(url: string): string | null {
   return (match && match[7].length === 11) ? match[7] : null;
 }
 
+async function fetchTranscriptWithRetry(videoId: string, maxRetries = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Add delay between retries
+      if (attempt > 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+      }
+      return await YoutubeTranscript.fetchTranscript(videoId);
+    } catch (error) {
+      lastError = error;
+      console.error(`Attempt ${attempt} failed:`, error);
+    }
+  }
+  throw lastError;
+}
+
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: '10mb',
+    externalResolver: true,
+  },
+};
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -63,8 +88,8 @@ export async function POST(request: Request) {
             message: 'Fetching YouTube transcript...'
           })}\n\n`));
 
-          // Get YouTube transcript
-          const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+          // Get YouTube transcript with retry logic
+          const transcript = await fetchTranscriptWithRetry(videoId);
           
           // Send progress update
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
@@ -93,11 +118,14 @@ export async function POST(request: Request) {
           controller.close();
         } catch (error) {
           console.error('Transcription error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const errorStack = error instanceof Error ? error.stack : '';
+          console.error('Error details:', { errorMessage, errorStack });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             error: 'Failed to fetch transcript',
             stage: 'error',
             progress: 0,
-            message: 'Could not fetch transcript for this video. Please try another video or check if the video has captions enabled.'
+            message: `Could not fetch transcript for this video. Error: ${errorMessage}. Please try another video or check if the video has captions enabled.`
           })}\n\n`));
           controller.close();
         }

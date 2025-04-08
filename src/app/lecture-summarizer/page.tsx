@@ -375,7 +375,7 @@ export default function LectureSummarizer() {
                 value={videoUrl}
                 onChange={handleVideoUrlChange}
                 placeholder="Paste YouTube video URL here..."
-                className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full p-4 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 placeholder:text-gray-500"
               />
               {videoUrl && (
                 <button
