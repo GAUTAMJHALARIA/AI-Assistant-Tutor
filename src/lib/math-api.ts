@@ -1,11 +1,29 @@
 import { generateMathSolution as geminiGenerateMathSolution, generateMathSolutionFromImage as geminiGenerateMathSolutionFromImage } from './gemini-api';
 
-export async function generateMathSolution(input: string) {
+interface ChatHistory {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface MathSolutionResponse {
+  steps: string;
+  explanation: string;
+  chatHistory?: ChatHistory[];
+}
+
+export async function generateMathSolution(input: string): Promise<MathSolutionResponse> {
   try {
     if (!input.trim()) {
       throw new Error('Please provide a math problem to solve');
     }
-    return await geminiGenerateMathSolution(input);
+    const solution = await geminiGenerateMathSolution(input);
+    return {
+      ...solution,
+      chatHistory: [
+        { role: 'user', content: input },
+        { role: 'assistant', content: `${solution.steps}\n\n${solution.explanation}` }
+      ]
+    };
   } catch (error) {
     console.error('Error generating math solution:', error);
     throw error instanceof Error ? error : new Error('An unexpected error occurred');

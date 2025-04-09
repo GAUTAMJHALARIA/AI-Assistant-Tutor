@@ -5,11 +5,13 @@ import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
 import Image from 'next/image';
 import { generateMathSolution, generateMathSolutionFromImage } from '@/lib/math-api';
 import ReactMarkdown from 'react-markdown';
+import ChatInterface from '@/components/ChatInterface';
 
 type InputMethod = 'draw' | 'upload' | 'text';
 type Solution = {
   steps: string;
   explanation: string;
+  chatHistory?: { role: 'user' | 'assistant'; content: string; }[];
 };
 
 export default function MathSolver() {
@@ -263,34 +265,37 @@ export default function MathSolver() {
       </div>
 
       {solution && (
-        <div className="mt-8 bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Solution</h2>
-          <div className="prose prose-indigo max-w-none">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-xl font-medium text-gray-900 mb-3">Step-by-Step Solution:</h3>
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <div className="text-gray-800">
-                    <ReactMarkdown>
-                      {solution.steps}
-                    </ReactMarkdown>
+        <>
+          <div className="mt-8 bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Solution</h2>
+            <div className="prose prose-indigo max-w-none">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-xl font-medium text-gray-900 mb-3">Step-by-Step Solution:</h3>
+                  <div className="bg-gray-50 p-6 rounded-lg">
+                    <div className="text-gray-800">
+                      <ReactMarkdown>
+                        {solution.steps}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <h3 className="text-xl font-medium text-gray-900 mb-3">Detailed Explanation:</h3>
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <div className="text-gray-800 leading-relaxed">
-                    <ReactMarkdown>
-                      {solution.explanation}
-                    </ReactMarkdown>
+                <div>
+                  <h3 className="text-xl font-medium text-gray-900 mb-3">Detailed Explanation:</h3>
+                  <div className="bg-gray-50 p-6 rounded-lg">
+                    <div className="text-gray-800 leading-relaxed">
+                      <ReactMarkdown>
+                        {solution.explanation}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+          <ChatInterface initialHistory={solution.chatHistory} />
+        </>
       )}
     </div>
   );
